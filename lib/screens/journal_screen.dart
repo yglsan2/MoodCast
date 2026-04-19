@@ -78,6 +78,7 @@ class _JournalScreenState extends State<JournalScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: GradientAppBar(
         title: '📖 Mon Journal',
         gradient: AppColors.gradientSecondary,
@@ -90,7 +91,7 @@ class _JournalScreenState extends State<JournalScreen> {
         ],
       ),
       body: Container(
-        color: AppColors.background,
+        color: Colors.transparent,
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _list.isEmpty
@@ -120,20 +121,31 @@ class _JournalScreenState extends State<JournalScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.menu_book_rounded, size: 56, color: AppColors.primary.withValues(alpha: 0.95)),
-            const SizedBox(height: 16),
+            Text('📔', style: TextStyle(fontSize: 44, height: 1)),
+            const SizedBox(height: 12),
             Text(
-              'Aucun MoodCast pour le moment',
+              'Ton journal t’attend',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
                     color: AppColors.textPrimary,
+                    letterSpacing: -0.2,
                   ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Text(
-              'Enregistrez votre humeur depuis l\'onglet MoodCast pour voir vos avis ici.',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 14, height: 1.4),
+              'Chaque MoodCast que tu enregistres dans l’onglet 🎙️ MoodCast apparaît ici, avec la date et l’humeur. C’est ton fil personnel de bienveillance.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 14, height: 1.5),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '👉 Onglet « MoodCast », tout à gauche en bas.',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
+              ),
               textAlign: TextAlign.center,
             ),
           ],

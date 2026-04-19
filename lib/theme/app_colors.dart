@@ -1,111 +1,133 @@
 import 'package:flutter/material.dart';
 
-/// Palette moderne, apaisante et un peu cool : bleu-gris doux, neutres frais, accent discret.
-/// Jeune et sobre, pas flashy ni vieillot.
+/// Charte unifiée « rose thé & mauve poudré » : une seule famille de teintes
+/// (chaud, doux, premium), accents et émotions dérivés pour cohérence visuelle.
 class AppColors {
   AppColors._();
 
-  // ——— Bleu-gris (principal, moderne et calme) ———
-  static const Color primary = Color(0xFF5B7A8F);
-  static const Color primaryLight = Color(0xFF7A9AAF);
-  static const Color primaryDark = Color(0xFF4A6578);
+  // ——— Marque (déclinaisons d’un même mauve-rose) ———
+  static const Color primary = Color(0xFF6E5A66);
+  static const Color primaryLight = Color(0xFF8E7A82);
+  static const Color primaryDark = Color(0xFF5A4A55);
 
-  // ——— Dégradés (cohérents, pas criards) ———
-  /// Barres et boutons principaux.
+  /// Compagnon (liens, WorldFlow) — même température que le primaire.
+  static const Color secondary = Color(0xFF7D6E78);
+  static const Color teal = secondary;
+
+  /// Accent chaud (récompenses, soleil) — reste dans les roses désaturés.
+  static const Color accent = Color(0xFFC9A399);
+  static const Color accentDeep = Color(0xFFB08A82);
+
+  static const Color coral = Color(0xFFC4776E);
+
+  // ——— Dégradés (tous basés sur primary / accent, pas de teal isolé) ———
   static const LinearGradient gradientPrimary = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF5B7A8F), Color(0xFF6B8A9F)],
+    colors: [Color(0xFF8B7380), Color(0xFF6E5A66)],
   );
 
-  /// Écrans secondaires, cartes douces.
   static const LinearGradient gradientSecondary = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF6B8A9F), Color(0xFF7A9AAF)],
+    colors: [Color(0xFF7D6E78), Color(0xFF6A5C68)],
   );
 
-  /// Accent (Horoscope, Biscuit, etc.) : ton chaud discret.
   static const LinearGradient gradientAccent = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFFC99B6D), Color(0xFFB8885A)],
+    colors: [Color(0xFFD4B5AD), Color(0xFFC9A399)],
   );
 
-  /// WorldFlow, liens.
   static const LinearGradient gradientOcean = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF5B7A8F), Color(0xFF6B8A9F)],
+    colors: [Color(0xFF7A6B76), Color(0xFF6E5A66)],
   );
 
-  /// Alerte / SOS.
   static const LinearGradient gradientSos = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFFC45C5C), Color(0xFFA84A4A)],
+    colors: [Color(0xFFC45C6A), Color(0xFF9E4D5C)],
   );
 
-  // ——— Alias ———
-  static const LinearGradient gradientCalm = gradientSecondary;
+  /// Fond écran : crème rosé très léger (cohérent avec les cartes).
+  static const LinearGradient scaffoldWash = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: [
+      Color(0xFFFFFBFA),
+      Color(0xFFFBF6F4),
+      Color(0xFFF5EEEB),
+    ],
+  );
+
+  static const LinearGradient gradientCalm = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF9A8A92), Color(0xFF7D6E78)],
+  );
+
   static const LinearGradient gradientWarm = gradientAccent;
-  static const LinearGradient gradientSunrise = gradientAccent;
-  static const LinearGradient gradientForest = gradientSecondary;
+  static const LinearGradient gradientSunrise = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFFE8C4B8), Color(0xFFD4A896)],
+  );
+  static const LinearGradient gradientForest = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF8A9B8E), Color(0xFF6E7D72)],
+  );
   static const LinearGradient gradientCosmic = gradientPrimary;
 
-  // ——— Couleurs plates ———
-  static const Color accent = Color(0xFFC99B6D);
-  static const Color teal = Color(0xFF6B8A9F);
-  static const Color coral = Color(0xFFC45C5C);
-
-  // ——— Émotions (nuances lisibles, harmonie avec la palette) ———
+  /// Émotions : restent dans mauve / rose / sauge doux (pas de verts criards ni bleus froids).
   static const Map<String, Color> emotionColors = {
-    'joie': Color(0xFF5B9A6B),
-    'heureux': Color(0xFF5B9A6B),
-    'sérénité': Color(0xFF6B8A9F),
-    'calme': Color(0xFF7A9AAF),
-    'enthousiasme': Color(0xFFC99B6D),
-    'gratitude': Color(0xFFB8A050),
-    'motivation': Color(0xFF5B7A8F),
-    'espoir': Color(0xFF5B9A6B),
-    'amour': Color(0xFFC97A8A),
-    'confiance': Color(0xFF5B7A8F),
-    'détente': Color(0xFF7A9AAF),
-    'inspiration': Color(0xFF9A7AB8),
-    'fierté': Color(0xFFC99B6D),
-    'tendresse': Color(0xFFC97A8A),
-    'curiosité': Color(0xFF7A9AAF),
-    'optimisme': Color(0xFF5B9A6B),
-    'légèreté': Color(0xFFB8A050),
-    'bienveillance': Color(0xFF5B9A6B),
-    'créativité': Color(0xFF9A7AB8),
-    'nostalgie': Color(0xFF8A7A9F),
-    'doute': Color(0xFF8A8580),
-    'stress': Color(0xFFC45C5C),
-    'anxiété': Color(0xFFB8885A),
-    'fatigue': Color(0xFF7A7A7A),
-    'tristesse': Color(0xFF6B8A9F),
-    'mélancolie': Color(0xFF8A7A9F),
+    'joie': Color(0xFF7FA08A),
+    'heureux': Color(0xFF7FA08A),
+    'sérénité': Color(0xFF8E7A82),
+    'calme': Color(0xFF9A8A92),
+    'enthousiasme': Color(0xFFD4A896),
+    'gratitude': Color(0xFFC4A574),
+    'motivation': Color(0xFF6E5A66),
+    'espoir': Color(0xFF8FA896),
+    'amour': Color(0xFFC98FA0),
+    'confiance': Color(0xFF7D6E78),
+    'détente': Color(0xFF9A8A92),
+    'inspiration': Color(0xFFA892B8),
+    'fierté': Color(0xFFD4A896),
+    'tendresse': Color(0xFFC98FA0),
+    'curiosité': Color(0xFF8E7A82),
+    'optimisme': Color(0xFF7FA08A),
+    'légèreté': Color(0xFFC4B89A),
+    'bienveillance': Color(0xFF8FA896),
+    'créativité': Color(0xFFA892B8),
+    'nostalgie': Color(0xFF8E7E8A),
+    'doute': Color(0xFF918A8E),
+    'stress': Color(0xFFC4776E),
+    'anxiété': Color(0xFFC9A399),
+    'fatigue': Color(0xFF8E868A),
+    'tristesse': Color(0xFF7D8A96),
+    'mélancolie': Color(0xFF8E7E8A),
     'colere': Color(0xFFC45C5C),
-    'irritation': Color(0xFFC99B6D),
-    'inquiétude': Color(0xFFB8885A),
+    'irritation': Color(0xFFD4A896),
+    'inquiétude': Color(0xFFC9A399),
   };
 
   static Color emotionColor(String? emotion) {
-    if (emotion == null) return const Color(0xFF7A7A7A);
-    return emotionColors[emotion] ?? emotionColors[emotion.toLowerCase()] ?? const Color(0xFF7A7A7A);
+    if (emotion == null) return const Color(0xFF8E868A);
+    return emotionColors[emotion] ?? emotionColors[emotion.toLowerCase()] ?? const Color(0xFF8E868A);
   }
 
-  static const Color success = Color(0xFF5B9A6B);
-  static const Color warning = Color(0xFFB8A050);
-  static const Color error = Color(0xFFC45C5C);
-  static const Color info = Color(0xFF6B8A9F);
+  static const Color success = Color(0xFF7FA08A);
+  static const Color warning = Color(0xFFC4A574);
+  static const Color error = Color(0xFFC45C6A);
+  static const Color info = Color(0xFF8E7A82);
 
-  // ——— Surfaces et texte (fond frais, lisible) ———
-  static const Color background = Color(0xFFF4F6F8);
-  static const Color cardBackground = Color(0xFFFFFFFF);
-  static const Color surface = Color(0xFFEBEEF2);
-  static const Color textPrimary = Color(0xFF1E252B);
-  static const Color textSecondary = Color(0xFF5E6B78);
-  static const Color textOnPrimary = Color(0xFFFFFFFF);
+  static const Color background = Color(0xFFFBF6F4);
+  static const Color cardBackground = Color(0xFFFFFEFE);
+  static const Color surface = Color(0xFFF0E8E5);
+  static const Color textPrimary = Color(0xFF2D2428);
+  static const Color textSecondary = Color(0xFF6B6066);
+  static const Color textOnPrimary = Color(0xFFFFFBFA);
 }

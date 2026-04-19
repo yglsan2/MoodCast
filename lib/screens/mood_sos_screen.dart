@@ -8,6 +8,7 @@ import '../services/storage_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/gradient_app_bar.dart';
 import '../widgets/feel_good_card.dart';
+import '../widgets/encouragement_vocals_panel.dart';
 
 /// "J'ai besoin d'encouragements" : podcast de soutien personnalisé ou demande à un proche.
 class MoodSosScreen extends StatefulWidget {
@@ -120,7 +121,7 @@ class _MoodSosScreenState extends State<MoodSosScreen> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'Choisis comment tu veux recevoir un peu de lumière : un encouragement personnalisé (voix) ou un message à ton proche.',
+                    'Un vocal que tu t\'enregistres, un mini-podcast généré pour toi, ou un SMS à ton proche — à toi de choisir.',
                     style: TextStyle(
                       fontSize: 14,
                       height: 1.45,
@@ -131,6 +132,8 @@ class _MoodSosScreenState extends State<MoodSosScreen> {
               ),
             ),
             const SizedBox(height: 24),
+            const EncouragementVocalsPanel(),
+            const SizedBox(height: 28),
             Text(
               'Encouragements automatiques',
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
@@ -140,7 +143,7 @@ class _MoodSosScreenState extends State<MoodSosScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Un mini-podcast de soutien, adapté à ton mood et à ton thème astral.',
+              'Texte lu à voix haute (synthèse) : mini-podcast adapté à ton mood et à ton thème astral — ce n\'est pas ton enregistrement vocal.',
               style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
             ),
             const SizedBox(height: 12),
@@ -152,8 +155,8 @@ class _MoodSosScreenState extends State<MoodSosScreen> {
                       height: 22,
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
-                  : Icon(_playing ? Icons.stop_rounded : Icons.record_voice_over_rounded, size: 22),
-              label: Text(_loading ? 'Génération…' : _playing ? 'Arrêter' : 'Écouter un encouragement'),
+                  : Icon(_playing ? Icons.stop_rounded : Icons.auto_stories_rounded, size: 22),
+              label: Text(_loading ? 'Génération…' : _playing ? 'Arrêter' : 'Écouter le mini-podcast'),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 backgroundColor: AppColors.primary,

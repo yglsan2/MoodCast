@@ -18,6 +18,7 @@ import 'mood_pulse_screen.dart';
 import 'support_screen.dart';
 import 'sos_screen.dart';
 import 'settings_screen.dart';
+import 'mood_cast_plus_screen.dart';
 
 class MoreScreen extends StatelessWidget {
   const MoreScreen({super.key});
@@ -34,15 +35,62 @@ class MoreScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: const GradientAppBar(
         title: '✨ Plus',
-        gradient: AppColors.gradientSecondary,
+        gradient: AppColors.gradientPrimary,
       ),
       body: Container(
-        color: AppColors.background,
+        color: Colors.transparent,
         child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
           children: [
+            FeelGoodCard(
+              margin: EdgeInsets.zero,
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Pourquoi MoodCast te suit au quotidien',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
+                  ),
+                  const SizedBox(height: 12),
+                  _ValueRow(icon: Icons.mic_rounded, text: 'Donner une forme douce à ce que tu ressens (voix → message).'),
+                  const SizedBox(height: 8),
+                  _ValueRow(icon: Icons.menu_book_rounded, text: 'Te souvenir que tes hauts et bas comptent — et les retrouver dans ton journal.'),
+                  const SizedBox(height: 8),
+                  _ValueRow(icon: Icons.shield_moon_rounded, text: 'Rituels, sécurité discrète (MoodSafe), soutien : une app pensée pour les journées chargées.'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12, left: 4),
+              child: Text(
+                'En dessous : astro, partage, sons apaisants, résumé de semaine — des bonus autour de ton cœur d’app (MoodCast & journal).',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                      height: 1.45,
+                      fontWeight: FontWeight.w500,
+                    ),
+              ),
+            ),
+            _Tile(
+              icon: Icons.workspace_premium_rounded,
+              title: 'MoodCast+',
+              subtitle: 'Styles premium, plan hebdo — essai 7 jours & codes',
+              gradient: AppColors.gradientAccent,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const MoodCastPlusScreen()),
+                );
+              },
+            ),
             FutureBuilder<bool>(
               future: _shouldShowWeeklySummaryPrompt(),
               builder: (context, snap) {
@@ -261,6 +309,34 @@ class MoreScreen extends StatelessWidget {
     );
   }
 
+}
+
+class _ValueRow extends StatelessWidget {
+  const _ValueRow({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: AppColors.primary),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontSize: 13,
+              height: 1.4,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _Tile extends StatelessWidget {

@@ -5,6 +5,8 @@ import '../models/mood_cast.dart';
 import '../services/storage_service.dart';
 import '../services/streak_service.dart';
 import '../services/risk_days_service.dart';
+import '../services/premium_service.dart';
+import 'mood_cast_plus_screen.dart';
 import '../theme/app_colors.dart';
 import '../widgets/gradient_app_bar.dart';
 import '../widgets/feel_good_card.dart';
@@ -20,6 +22,7 @@ class _StatsScreenState extends State<StatsScreen> {
   List<MoodCast> _list = [];
   StreakResult? _streak;
   bool _loading = true;
+  bool _isPremium = false;
 
   @override
   void initState() {
@@ -31,10 +34,12 @@ class _StatsScreenState extends State<StatsScreen> {
     setState(() => _loading = true);
     final list = await StorageService.getMoodCasts();
     final streak = await StreakService.getResult();
+    final premium = await PremiumService.isPremium();
     if (mounted) {
       setState(() {
         _list = list;
         _streak = streak;
+        _isPremium = premium;
         _loading = false;
       });
     }
@@ -69,9 +74,10 @@ class _StatsScreenState extends State<StatsScreen> {
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
+        backgroundColor: Colors.transparent,
         appBar: const GradientAppBar(title: '📊 Statistiques', gradient: AppColors.gradientPrimary),
         body: Container(
-          color: AppColors.background,
+          color: Colors.transparent,
           child: const Center(child: CircularProgressIndicator()),
         ),
       );
@@ -97,6 +103,7 @@ class _StatsScreenState extends State<StatsScreen> {
     final avgEnergy = total > 0 ? (sumEnergy / total).toStringAsFixed(1) : '—';
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: GradientAppBar(
         title: '📊 Statistiques',
         gradient: AppColors.gradientPrimary,
@@ -109,7 +116,7 @@ class _StatsScreenState extends State<StatsScreen> {
         ],
       ),
       body: Container(
-        color: AppColors.background,
+        color: Colors.transparent,
         child: total == 0
             ? _buildEmptyState(context)
             : RefreshIndicator(
@@ -121,6 +128,43 @@ class _StatsScreenState extends State<StatsScreen> {
                   child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    if (!_isPremium)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: FeelGoodCard(
+                          margin: EdgeInsets.zero,
+                          gradient: AppColors.gradientAccent,
+                          padding: const EdgeInsets.all(18),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'MoodCast+',
+                                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.textPrimary,
+                                    ),
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                'Débloque les styles Poésie & Énergie + un plan d’action hebdo. Essai 7 jours ou codes promo — puis abonnement sur les stores.',
+                                style: TextStyle(fontSize: 13, height: 1.4, color: AppColors.textSecondary),
+                              ),
+                              const SizedBox(height: 12),
+                              FilledButton(
+                                onPressed: () async {
+                                  await Navigator.push<void>(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const MoodCastPlusScreen()),
+                                  );
+                                  _load();
+                                },
+                                child: const Text('Voir l’offre'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     if (_streak != null) ...[
                       FeelGoodCard(
                         gradient: AppColors.gradientAccent,
@@ -342,25 +386,39 @@ class _StatsScreenState extends State<StatsScreen> {
     return Center(
       child: FeelGoodCard(
         margin: const EdgeInsets.symmetric(horizontal: 24),
-        gradient: AppColors.gradientAccent,
+        gradient: AppColors.gradientPrimary,
         padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.insights_rounded, size: 56, color: AppColors.accent),
-            const SizedBox(height: 16),
+            const Icon(Icons.insights_rounded, size: 52, color: AppColors.textOnPrimary),
+            const SizedBox(height: 14),
             Text(
-              'Aucune donnée pour l\'instant',
+              'Tes stats t’attendent',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textOnPrimary,
                   ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 10),
             Text(
-              'Enregistrez des MoodCasts pour voir vos statistiques et votre évolution.',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 14, height: 1.4),
+              'Dès que tu enregistres des MoodCasts, cette page devient ton tableau de bord émotionnel : tendances sur 7 / 30 jours, humeur dominante, série de jours — sans te juger.',
+              style: TextStyle(
+                color: AppColors.textOnPrimary.withValues(alpha: 0.92),
+                fontSize: 14,
+                height: 1.45,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '1. Onglet MoodCast · 2. Parler 10 s · 3. Revenir ici pour voir la magie opérer',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textOnPrimary.withValues(alpha: 0.88),
+              ),
               textAlign: TextAlign.center,
             ),
           ],

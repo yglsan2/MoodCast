@@ -1,4 +1,4 @@
-package com.example.moodcast_worldflow
+package com.moodcast.worldflow
 
 import io.flutter.embedding.android.FlutterActivity
 

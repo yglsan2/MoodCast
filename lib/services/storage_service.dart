@@ -562,5 +562,64 @@ class StorageService {
     } catch (_) {}
   }
 
+  // ——— MoodCast+ (abonnement / essai / codes — persistance locale, stores à brancher plus tard) ———
+  static const String _keyPremiumUntil = 'premium_until_iso';
+  static const String _keyLifetimePremium = 'premium_lifetime';
+  static const String _keyFreeTrialConsumed = 'premium_trial_consumed';
+
+  static Future<DateTime?> getPremiumUntil() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final s = prefs.getString(_keyPremiumUntil);
+      if (s == null || s.isEmpty) return null;
+      return DateTime.tryParse(s);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> setPremiumUntil(DateTime? until) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (until == null) {
+        await prefs.remove(_keyPremiumUntil);
+      } else {
+        await prefs.setString(_keyPremiumUntil, until.toIso8601String());
+      }
+    } catch (_) {}
+  }
+
+  static Future<bool> isLifetimePremium() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_keyLifetimePremium) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<void> setLifetimePremium(bool value) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_keyLifetimePremium, value);
+    } catch (_) {}
+  }
+
+  static Future<bool> hasConsumedFreeTrial() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_keyFreeTrialConsumed) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<void> setHasConsumedFreeTrial(bool value) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_keyFreeTrialConsumed, value);
+    } catch (_) {}
+  }
+
   static String todayString() => _todayString();
 }

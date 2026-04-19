@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:record/record.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:geolocator/geolocator.dart';
@@ -14,6 +14,9 @@ import '../models/mood_cast.dart';
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
 import '../services/podcast_enricher_service.dart';
+import '../services/premium_service.dart';
+import '../services/voice_mood_analyzer.dart';
+import 'mood_cast_plus_screen.dart';
 import '../theme/app_colors.dart';
 import '../widgets/gradient_app_bar.dart';
 import '../widgets/feel_good_card.dart';
@@ -36,6 +39,8 @@ class _MoodCastScreenState extends State<MoodCastScreen> {
   bool _isProcessing = false;
   int _recordingSeconds = 0;
   Timer? _timer;
+  StreamSubscription<Amplitude>? _ampSub;
+  final List<Amplitude> _ampSamples = [];
 
   String _selectedStyle = 'motivation';
   static const List<String> _styles = ['motivation', 'humour', 'zen', 'poesie', 'energie'];
@@ -52,16 +57,30 @@ class _MoodCastScreenState extends State<MoodCastScreen> {
   bool _isGeneratingPodcast = false;
 
   String? _errorMessage;
+  bool _isPremium = false;
 
   @override
   void initState() {
     super.initState();
     _tts.setLanguage('fr-FR');
+    _refreshPremium();
+  }
+
+  Future<void> _refreshPremium() async {
+    final p = await PremiumService.isPremium();
+    if (!mounted) return;
+    if (!p && PremiumService.premiumOnlyStyles.contains(_selectedStyle)) {
+      setState(() => _selectedStyle = 'motivation');
+    }
+    setState(() => _isPremium = p);
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    unawaited(_ampSub?.cancel());
+    unawaited(_tts.stop());
+    unawaited(_recorder.dispose());
     super.dispose();
   }
 
@@ -76,8 +95,27 @@ class _MoodCastScreenState extends State<MoodCastScreen> {
 
     try {
       final dir = await getTemporaryDirectory();
-      final path = p.join(dir.path, 'moodcast_${DateTime.now().millisecondsSinceEpoch}.m4a');
-      await _recorder.start(const RecordConfig(encoder: AudioEncoder.aacLc), path: path);
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final wavOk = await _recorder.isEncoderSupported(AudioEncoder.wav);
+      final String path;
+      final RecordConfig cfg;
+      if (wavOk) {
+        path = p.join(dir.path, 'moodcast_$ts.wav');
+        cfg = const RecordConfig(
+          encoder: AudioEncoder.wav,
+          sampleRate: 16000,
+          numChannels: 1,
+        );
+      } else {
+        path = p.join(dir.path, 'moodcast_$ts.m4a');
+        cfg = const RecordConfig(encoder: AudioEncoder.aacLc, sampleRate: 16000, numChannels: 1);
+      }
+      await _recorder.start(cfg, path: path);
+      _ampSamples.clear();
+      await _ampSub?.cancel();
+      _ampSub = _recorder.onAmplitudeChanged(const Duration(milliseconds: 200)).listen((a) {
+        _ampSamples.add(a);
+      });
       setState(() {
         _isRecording = true;
         _recordPath = path;
@@ -87,6 +125,12 @@ class _MoodCastScreenState extends State<MoodCastScreen> {
         if (mounted) setState(() => _recordingSeconds++);
       });
     } catch (e) {
+      await _ampSub?.cancel();
+      _ampSub = null;
+      _ampSamples.clear();
+      try {
+        await _recorder.stop();
+      } catch (_) {}
       if (mounted) {
         _showError('L\'enregistrement n\'est pas disponible sur cet appareil. Réessayez ou utilisez un autre support.');
       }
@@ -102,12 +146,16 @@ class _MoodCastScreenState extends State<MoodCastScreen> {
         _errorMessage = 'Pas assez de matière pour analyser votre humeur. Parlez au moins $_minRecordingSeconds secondes, puis réessayez.';
       });
       try {
+        await _ampSub?.cancel();
+        _ampSub = null;
         await _recorder.stop();
       } catch (_) {}
       return;
     }
     try {
       final path = await _recorder.stop();
+      await _ampSub?.cancel();
+      _ampSub = null;
       setState(() {
         _isRecording = false;
         _recordPath = path;
@@ -116,6 +164,8 @@ class _MoodCastScreenState extends State<MoodCastScreen> {
       });
       await _processRecording(path ?? _recordPath);
     } catch (e) {
+      await _ampSub?.cancel();
+      _ampSub = null;
       if (mounted) {
         setState(() {
           _isProcessing = false;
@@ -149,15 +199,16 @@ class _MoodCastScreenState extends State<MoodCastScreen> {
       }
     } catch (_) {}
 
-    final analysis = await ApiService.analyzeMood(audioUri: audioPath);
+    final seconds = _recordingSeconds;
+    // Analyse locale : MFCC + TFLite (SER) + signal d’amplitude fusionnés (aucun serveur).
+    final analysis = await VoiceMoodAnalyzer.analyzeHybrid(
+      wavPath: audioPath,
+      samples: List<Amplitude>.from(_ampSamples),
+      durationSeconds: seconds,
+    );
+    _ampSamples.clear();
 
-    if (analysis == null || !mounted) {
-      setState(() {
-        _isProcessing = false;
-        _errorMessage = 'Nous n\'avons pas pu analyser votre enregistrement. Parlez 10 à 20 secondes dans un endroit calme, puis réessayez.';
-      });
-      return;
-    }
+    if (!mounted) return;
 
     if (mounted) {
       setState(() {
@@ -263,25 +314,32 @@ class _MoodCastScreenState extends State<MoodCastScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: const GradientAppBar(
-        title: '🌗 MoodCast',
+        title: '🎙️ MoodCast',
         gradient: AppColors.gradientPrimary,
       ),
-      body: Container(
-        color: AppColors.background,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          child: Column(
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (_errorMessage != null) _buildErrorCard(),
             if (!_hasResult && !_isProcessing && _detectedAnalysis == null) _buildEmptyOrRecordState(),
             if (_isProcessing) _buildProcessingState(),
-            if (_detectedAnalysis != null && !_hasResult) _buildRefineCard(),
+            if (_detectedAnalysis != null && !_hasResult && !_isGeneratingPodcast) _buildRefineCard(),
             if (_isGeneratingPodcast) _buildProcessingState(),
-            if (_hasResult) _buildResultCard(),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 420),
+              switchInCurve: Curves.easeOutCubic,
+              child: _hasResult
+                  ? KeyedSubtree(
+                      key: const ValueKey('result'),
+                      child: _buildResultCard(),
+                    )
+                  : const SizedBox.shrink(key: ValueKey('no-result')),
+            ),
           ],
-          ),
         ),
       ),
     );
@@ -331,31 +389,49 @@ class _MoodCastScreenState extends State<MoodCastScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         FeelGoodCard(
-          gradient: AppColors.gradientSecondary,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              _PillarChip(icon: Icons.self_improvement_rounded, label: 'Clarté'),
+              const SizedBox(width: 8),
+              _PillarChip(icon: Icons.volunteer_activism_rounded, label: 'Douceur'),
+              const SizedBox(width: 8),
+              _PillarChip(icon: Icons.auto_graph_rounded, label: 'Suivi'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        FeelGoodCard(
+          gradient: AppColors.gradientPrimary,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
           child: Column(
             children: [
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.6),
+                  color: Colors.white.withValues(alpha: 0.55),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.record_voice_over_rounded, size: 48, color: AppColors.primary),
+                child: const Icon(Icons.mic_rounded, size: 48, color: AppColors.textOnPrimary),
               ),
               const SizedBox(height: 16),
               Text(
-                'Pas encore d\'avis personnalisé',
+                'Ton check-in vocal',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textOnPrimary,
+                      letterSpacing: -0.2,
                     ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 10),
               Text(
-                'Nous n\'avons pas encore assez de matière pour vous donner un avis. Enregistrez 10 à 20 secondes de voix pour recevoir un avis personnalisé basé sur votre humeur.',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 14, height: 1.45),
+                'Quand les pensées s’emmêlent, entendre une voix bienveillante (la tienne, puis la nôtre) aide à poser les choses. Quelques secondes suffisent : analyse du ton, humeur confirmée par toi, puis un mini-texte à écouter — gardé dans ton journal.',
+                style: TextStyle(
+                  color: AppColors.textOnPrimary.withValues(alpha: 0.92),
+                  fontSize: 14,
+                  height: 1.5,
+                ),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -375,23 +451,56 @@ class _MoodCastScreenState extends State<MoodCastScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Style du podcast',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Style du podcast',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
                 ),
+              ),
+              if (!_isPremium)
+                TextButton(
+                  onPressed: () async {
+                    await Navigator.push<void>(
+                      context,
+                      MaterialPageRoute(builder: (_) => const MoodCastPlusScreen()),
+                    );
+                    await _refreshPremium();
+                  },
+                  child: const Text('MoodCast+'),
+                ),
+            ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 6),
+          Text(
+            'Poésie & Énergie : réservés aux abonné·es MoodCast+ (essai 7 jours dans Plus).',
+            style: TextStyle(fontSize: 11, color: AppColors.textSecondary.withValues(alpha: 0.9)),
+          ),
+          const SizedBox(height: 10),
           Wrap(
             spacing: 10,
             runSpacing: 10,
             children: _styles.map((s) {
               final selected = _selectedStyle == s;
+              final locked = !_isPremium && PremiumService.premiumOnlyStyles.contains(s);
               return Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  onTap: () => setState(() => _selectedStyle = s),
+                  onTap: () async {
+                    if (locked) {
+                      await Navigator.push<void>(
+                        context,
+                        MaterialPageRoute(builder: (_) => const MoodCastPlusScreen()),
+                      );
+                      await _refreshPremium();
+                      return;
+                    }
+                    setState(() => _selectedStyle = s);
+                  },
                   borderRadius: BorderRadius.circular(14),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
@@ -400,13 +509,23 @@ class _MoodCastScreenState extends State<MoodCastScreen> {
                       gradient: selected ? AppColors.gradientPrimary : null,
                       color: selected ? null : AppColors.surface,
                       borderRadius: BorderRadius.circular(14),
+                      border: locked ? Border.all(color: AppColors.accent.withValues(alpha: 0.5)) : null,
                     ),
-                    child: Text(
-                      s,
-                      style: TextStyle(
-                        color: selected ? AppColors.textOnPrimary : AppColors.textSecondary,
-                        fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (locked) ...[
+                          Icon(Icons.lock_rounded, size: 16, color: AppColors.accentDeep),
+                          const SizedBox(width: 6),
+                        ],
+                        Text(
+                          s,
+                          style: TextStyle(
+                            color: selected ? AppColors.textOnPrimary : AppColors.textSecondary,
+                            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -483,6 +602,15 @@ class _MoodCastScreenState extends State<MoodCastScreen> {
           Text(
             'Confirmez ou modifiez ci-dessous pour un texte parfaitement adapté.',
             style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Analyse sur ton téléphone : modèle vocal léger (TFLite + MFCC) fusionné avec le signal d’amplitude. Sans WAV 16 kHz, seul le signal d’amplitude est utilisé. Ce n’est pas un diagnostic — ajuste l’humeur si besoin.',
+            style: TextStyle(
+              color: AppColors.textSecondary.withValues(alpha: 0.88),
+              fontSize: 11,
+              height: 1.35,
+            ),
           ),
           const SizedBox(height: 16),
           Wrap(
@@ -569,27 +697,49 @@ class _MoodCastScreenState extends State<MoodCastScreen> {
     final emotion = _moodResult!.emotion;
     final color = AppColors.emotionColor(emotion);
     return FeelGoodCard(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          color.withValues(alpha: 0.12),
+          AppColors.cardBackground,
+        ],
+      ),
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
+              Icon(Icons.auto_awesome_rounded, color: color, size: 22),
+              const SizedBox(width: 8),
+              Text(
+                'Voilà ton avis',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: _reset,
+                child: const Text('Nouveau'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.15),
+                  color: color.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   Emotions.label(emotion),
                   style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 14),
                 ),
-              ),
-              const Spacer(),
-              TextButton(
-                onPressed: _reset,
-                child: const Text('Nouveau'),
               ),
             ],
           ),
@@ -620,6 +770,42 @@ class _MoodCastScreenState extends State<MoodCastScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _PillarChip extends StatelessWidget {
+  const _PillarChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.12)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 22, color: AppColors.primary),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

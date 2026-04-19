@@ -4,7 +4,6 @@ import 'package:latlong2/latlong.dart';
 
 import '../models/world_flow_data.dart';
 import '../services/api_service.dart';
-import '../services/storage_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/gradient_app_bar.dart';
 import '../widgets/feel_good_card.dart';
@@ -18,7 +17,6 @@ class WorldFlowScreen extends StatefulWidget {
 
 class _WorldFlowScreenState extends State<WorldFlowScreen> {
   WorldFlowData? _data;
-  List<WorldFlowRegion> _userRegions = [];
   String _filter = 'today';
   bool _loading = true;
 
@@ -31,22 +29,9 @@ class _WorldFlowScreenState extends State<WorldFlowScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     final data = await ApiService.fetchWorldFlowData(timeFilter: _filter);
-    final moodCasts = await StorageService.getMoodCasts();
-    final withLocation = moodCasts.where((c) => c.location != null).toList();
-    final userRegions = withLocation
-        .map((c) => WorldFlowRegion(
-              name: 'Votre MoodCast',
-              latitude: c.location!.latitude,
-              longitude: c.location!.longitude,
-              dominantEmotion: c.emotion,
-              averageIntensity: c.intensity.toDouble(),
-              averageEnergy: c.energy.toDouble(),
-            ))
-        .toList();
     if (mounted) {
       setState(() {
         _data = data;
-        _userRegions = userRegions;
         _loading = false;
       });
     }
@@ -63,16 +48,12 @@ class _WorldFlowScreenState extends State<WorldFlowScreen> {
     return m[e] ?? '😐';
   }
 
-  List<WorldFlowRegion> get _allRegions {
-    final fromApi = _data?.regions ?? [];
-    return [...fromApi, ..._userRegions];
-  }
-
-  int get _apiRegionsCount => _data?.regions.length ?? 0;
+  List<WorldFlowRegion> get _allRegions => _data?.regions ?? [];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: GradientAppBar(
         title: '🌍 WorldFlow',
         gradient: AppColors.gradientOcean,
@@ -101,12 +82,12 @@ class _WorldFlowScreenState extends State<WorldFlowScreen> {
         ],
       ),
       body: Container(
-        color: AppColors.background,
+        color: Colors.transparent,
         child: _loading && _data == null
             ? const Center(child: CircularProgressIndicator())
             : Column(
                 children: [
-                  if (_data != null || _userRegions.isNotEmpty)
+                  if (_data != null)
                     FeelGoodCard(
                       margin: const EdgeInsets.all(16),
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -132,7 +113,7 @@ class _WorldFlowScreenState extends State<WorldFlowScreen> {
                               ),
                               const SizedBox(width: 12),
                               Text(
-                                '${(_data?.totalMoodCasts ?? 0) + _userRegions.length} MoodCasts · ${_allRegions.length} point${_allRegions.length > 1 ? 's' : ''}',
+                                '${_data?.totalMoodCasts ?? 0} MoodCasts · ${_allRegions.length} point${_allRegions.length > 1 ? 's' : ''}',
                                 style: const TextStyle(
                                   fontSize: 13,
                                   color: AppColors.textSecondary,
@@ -140,19 +121,7 @@ class _WorldFlowScreenState extends State<WorldFlowScreen> {
                               ),
                             ],
                           ),
-                          if (_userRegions.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 6),
-                              child: Text(
-                                '${_emotionEmoji(_userRegions.first.dominantEmotion)} Vos MoodCasts avec position apparaissent sur la carte',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.teal,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            )
-                          else if (_data?.trends.isNotEmpty == true) ...[
+                          if (_data?.trends.isNotEmpty == true) ...[
                             const SizedBox(height: 8),
                             Text(
                               _data!.trends.first,
@@ -160,6 +129,17 @@ class _WorldFlowScreenState extends State<WorldFlowScreen> {
                                 fontSize: 13,
                                 color: AppColors.teal,
                                 fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                          if (_allRegions.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'Les tuiles de carte viennent d’OpenStreetMap (Internet). Tes MoodCasts et agrégats restent sur l’appareil.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                height: 1.35,
+                                color: AppColors.textSecondary.withValues(alpha: 0.9),
                               ),
                             ),
                           ],
@@ -188,7 +168,7 @@ class _WorldFlowScreenState extends State<WorldFlowScreen> {
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    'Les MoodCasts enregistrés avec position (MoodCast) apparaîtront ici.',
+                                    'Les MoodCasts enregistrés avec position sont agrégés ici sur ton téléphone (aucun serveur).',
                                     style: TextStyle(
                                       fontSize: 13,
                                       color: AppColors.textSecondary,
@@ -214,25 +194,18 @@ class _WorldFlowScreenState extends State<WorldFlowScreen> {
                                 userAgentPackageName: 'com.moodcast.worldflow',
                               ),
                               MarkerLayer(
-                                markers: _allRegions.asMap().entries.map((entry) {
-                                  final i = entry.key;
-                                  final r = entry.value;
-                                  final isUser = i >= _apiRegionsCount;
+                                markers: _allRegions.map((r) {
                                   return Marker(
                                     point: LatLng(r.latitude, r.longitude),
                                     width: 44,
                                     height: 44,
                                     child: Tooltip(
-                                      message: isUser
-                                          ? 'Votre MoodCast · ${_emotionEmoji(r.dominantEmotion)} ${r.dominantEmotion}'
-                                          : '${r.name}\n${_emotionEmoji(r.dominantEmotion)} ${r.dominantEmotion}',
+                                      message: '${r.name}\n${_emotionEmoji(r.dominantEmotion)} ${r.dominantEmotion}',
                                       child: Container(
                                         decoration: BoxDecoration(
                                           color: _emotionColor(r.dominantEmotion),
                                           shape: BoxShape.circle,
-                                          border: isUser
-                                              ? Border.all(color: Colors.white, width: 3)
-                                              : null,
+                                          border: Border.all(color: Colors.white, width: 3),
                                           boxShadow: [
                                             BoxShadow(
                                               color: _emotionColor(r.dominantEmotion).withValues(alpha: 0.5),

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import '../theme/app_colors.dart';
 import '../widgets/gradient_app_bar.dart';
@@ -401,8 +400,10 @@ class _HoroscopeScreenState extends State<HoroscopeScreen> with SingleTickerProv
     required int month,
     required ValueChanged<int?> onChanged,
   }) {
+    final dayVal = value.clamp(1, maxDay);
     return DropdownButtonFormField<int>(
-      value: value.clamp(1, maxDay),
+      key: ValueKey<String>('birth-day-$year-$month-$maxDay-$dayVal'),
+      initialValue: dayVal,
       decoration: const InputDecoration(
         labelText: 'Jour',
         isDense: true,
@@ -418,7 +419,8 @@ class _HoroscopeScreenState extends State<HoroscopeScreen> with SingleTickerProv
     required ValueChanged<int?> onChanged,
   }) {
     return DropdownButtonFormField<int>(
-      value: value,
+      key: ValueKey<String>('birth-month-$value'),
+      initialValue: value,
       decoration: const InputDecoration(
         labelText: 'Mois',
         isDense: true,
@@ -438,8 +440,10 @@ class _HoroscopeScreenState extends State<HoroscopeScreen> with SingleTickerProv
   }) {
     final now = DateTime.now();
     final years = List.generate(now.year - 1900 + 1, (i) => now.year - i);
+    final yearVal = years.contains(value) ? value : now.year - 25;
     return DropdownButtonFormField<int>(
-      value: years.contains(value) ? value : now.year - 25,
+      key: ValueKey<String>('birth-year-$yearVal'),
+      initialValue: yearVal,
       decoration: const InputDecoration(
         labelText: 'Année',
         isDense: true,

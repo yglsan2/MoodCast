@@ -39,8 +39,8 @@ class CalendarPostitService {
     DateTime? end,
   }) {
     final endDate = end ?? start.add(const Duration(hours: 1));
-    final startStr = start.toUtc().toIso8601String().replaceAll('-', '').replaceAll(':', '').split('.').first + 'Z';
-    final endStr = endDate.toUtc().toIso8601String().replaceAll('-', '').replaceAll(':', '').split('.').first + 'Z';
+    final startStr = '${start.toUtc().toIso8601String().replaceAll('-', '').replaceAll(':', '').split('.').first}Z';
+    final endStr = '${endDate.toUtc().toIso8601String().replaceAll('-', '').replaceAll(':', '').split('.').first}Z';
     final encodedTitle = Uri.encodeComponent(title);
     final encodedDesc = Uri.encodeComponent(description);
     return 'https://outlook.live.com/calendar/0/action/compose?'

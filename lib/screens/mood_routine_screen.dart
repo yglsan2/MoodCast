@@ -21,7 +21,6 @@ class _MoodRoutineScreenState extends State<MoodRoutineScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   String? _userName;
-  String _intention = '';
   String? _morningEmotion;
   String? _eveningEmotion;
   String _astroShort = '';
@@ -97,7 +96,6 @@ class _MoodRoutineScreenState extends State<MoodRoutineScreen>
     if (mounted) {
       setState(() {
         _userName = name;
-        _intention = intention ?? '';
         _morningEmotion = morningEmotion;
         _eveningEmotion = eveningEmotion;
         _loading = false;
@@ -191,7 +189,7 @@ class _MoodRoutineScreenState extends State<MoodRoutineScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Bonjour${_userName != null && _userName!.isNotEmpty ? ' ${_userName}' : ''} !',
+                      'Bonjour${_userName != null && _userName!.isNotEmpty ? ' $_userName' : ''} !',
                       style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                             fontWeight: FontWeight.w800,
                             color: AppColors.textOnPrimary,
@@ -231,7 +229,7 @@ class _MoodRoutineScreenState extends State<MoodRoutineScreen>
                         isDense: true,
                       ),
                       maxLines: 2,
-                      onChanged: (v) => setState(() => _intention = v),
+                      onChanged: (_) => setState(() {}),
                     ),
                     const SizedBox(height: 8),
                     Wrap(

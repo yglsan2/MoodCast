@@ -514,7 +514,7 @@ class HoroscopeService {
         .replaceAll('{{element}}', chinese.element)
         .replaceAll('{{elementTrait}}', elementTrait)
         .replaceAll('{{year}}', year.toString());
-    text += '\n\nEn année du ${yearSign.animal} (${yearSign.element}), votre élément ${chinese.element} vous soutient : ${elementTrait}.';
+    text += '\n\nEn année du ${yearSign.animal} (${yearSign.element}), votre élément ${chinese.element} vous soutient : $elementTrait.';
     return text;
   }
 

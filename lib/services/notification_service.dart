@@ -1,6 +1,6 @@
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart'
+    show debugPrint, defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:flutter_local_notifications_linux/flutter_local_notifications_linux.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz_data;
@@ -22,41 +22,50 @@ class NotificationService {
 
   static Future<void> init() async {
     if (_initialized) return;
-    tz_data.initializeTimeZones();
+    if (kIsWeb) {
+      _initialized = true;
+      return;
+    }
     try {
-      final tzInfo = await FlutterTimezone.getLocalTimezone();
-      tz.setLocalLocation(tz.getLocation(tzInfo.identifier));
-    } catch (_) {
-      tz.setLocalLocation(tz.getLocation('Europe/Paris'));
+      tz_data.initializeTimeZones();
+      try {
+        final tzInfo = await FlutterTimezone.getLocalTimezone();
+        tz.setLocalLocation(tz.getLocation(tzInfo.identifier));
+      } catch (_) {
+        tz.setLocalLocation(tz.getLocation('Europe/Paris'));
+      }
+
+      const android = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const ios = DarwinInitializationSettings(
+        requestAlertPermission: true,
+        requestBadgePermission: false,
+      );
+      final initSettings = InitializationSettings(
+        android: android,
+        iOS: ios,
+        linux: defaultTargetPlatform == TargetPlatform.linux
+            ? const LinuxInitializationSettings(defaultActionName: 'Open')
+            : null,
+      );
+      await _plugin.initialize(initSettings);
+
+      final androidPlugin = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      if (androidPlugin != null) {
+        await androidPlugin.requestNotificationsPermission();
+      }
+      final iosPlugin = _plugin.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
+      if (iosPlugin != null) {
+        await iosPlugin.requestPermissions(alert: true);
+      }
+    } catch (e, st) {
+      debugPrint('NotificationService.init: $e\n$st');
     }
     _initialized = true;
-
-    const android = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const ios = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: false,
-    );
-    final initSettings = InitializationSettings(
-      android: android,
-      iOS: ios,
-      linux: defaultTargetPlatform == TargetPlatform.linux
-          ? const LinuxInitializationSettings(defaultActionName: 'Open')
-          : null,
-    );
-    await _plugin.initialize(initSettings);
-
-    final androidPlugin = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-    if (androidPlugin != null) {
-      await androidPlugin.requestNotificationsPermission();
-    }
-    final iosPlugin = _plugin.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
-    if (iosPlugin != null) {
-      await iosPlugin.requestPermissions(alert: true);
-    }
   }
 
   static Future<void> updateRoutineReminders() async {
     await init();
+    if (kIsWeb) return;
 
     await _plugin.cancel(_idRoutineMorning);
     await _plugin.cancel(_idRoutineEvening);
@@ -79,6 +88,7 @@ class NotificationService {
   /// Rappels les jours où tu es souvent en baisse (analyse des MoodCasts).
   static Future<void> updateRiskDaysReminders() async {
     await init();
+    if (kIsWeb) return;
 
     for (int w = 1; w <= 7; w++) {
       await _plugin.cancel(_idRiskDaysBase + w);
@@ -120,7 +130,8 @@ class NotificationService {
         'En général le $dayName tu es plus souvent en baisse. Pense à ton rituel !',
         scheduled,
         details,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        // inexact : pas de permission SCHEDULE_EXACT_ALARM (évite crash / refus au démarrage).
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
       );
@@ -168,7 +179,7 @@ class NotificationService {
       body,
       scheduled,
       details,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.time,
     );

@@ -79,7 +79,7 @@ class _MoodShareScreenState extends State<MoodShareScreen> {
       parts.add('\n🟨 Mon Post-it Mood :\n$_postitText');
     }
     if (parts.isEmpty) return 'MoodCast – Partagé avec 💜';
-    return parts.join('\n\n') + '\n\n— Envoyé depuis MoodCast 💜';
+    return '${parts.join('\n\n')}\n\n— Envoyé depuis MoodCast 💜';
   }
 
   Future<void> _share() async {

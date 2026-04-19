@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+
 import '../theme/app_colors.dart';
 
-/// Barre d'app avec dégradé feel-good et ombre douce.
+/// Barre d’app avec dégradé et léger relief.
 class GradientAppBar extends StatelessWidget implements PreferredSizeWidget {
   const GradientAppBar({
     super.key,
@@ -28,20 +29,20 @@ class GradientAppBar extends StatelessWidget implements PreferredSizeWidget {
         gradient: gradient ?? _defaultGradient,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
       child: AppBar(
         title: Text(
           title,
-          style: const TextStyle(
-            color: AppColors.textOnPrimary,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-          ),
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: AppColors.textOnPrimary,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.3,
+              ),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,

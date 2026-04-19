@@ -1,4 +1,3 @@
-import '../models/mood_cast.dart';
 import 'storage_service.dart';
 
 /// Analyse les jours de la semaine où l'utilisateur a le plus souvent un mood "bas" (stress, tristesse, fatigue, etc.).

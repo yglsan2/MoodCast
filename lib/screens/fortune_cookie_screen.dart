@@ -87,11 +87,13 @@ class _FortuneCookieScreenState extends State<FortuneCookieScreen>
     StorageService.saveTodayFortune(fortune);
     _splitController.forward(from: 0).then((_) {
       _messageController.forward(from: 0).then((_) {
-        if (mounted) setState(() {
-          _isAnimating = false;
-          _canOpenToday = false;
-          _todayMessage = fortune;
-        });
+        if (mounted) {
+          setState(() {
+            _isAnimating = false;
+            _canOpenToday = false;
+            _todayMessage = fortune;
+          });
+        }
       });
     });
   }

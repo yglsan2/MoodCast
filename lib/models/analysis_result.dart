@@ -1,4 +1,4 @@
-/// Résultat d'analyse d'humeur et de génération de podcast (partagé entre API et services).
+// Résultat d'analyse d'humeur et de génération de podcast (partagé entre API et services).
 
 class MoodAnalysisResult {
   const MoodAnalysisResult({

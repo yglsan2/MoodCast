@@ -6,12 +6,12 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../models/mood_cast.dart';
 import '../services/storage_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/gradient_app_bar.dart';
 import '../widgets/feel_good_card.dart';
 import 'legal_screen.dart';
+import 'mood_cast_plus_screen.dart';
 import '../services/notification_service.dart';
 
 /// Paramètres : confidentialité, préférences, à propos.
@@ -198,6 +198,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
             FeelGoodCard(
               margin: EdgeInsets.zero,
               padding: EdgeInsets.zero,
+              child: ListTile(
+                leading: Icon(Icons.workspace_premium_rounded, color: AppColors.primary),
+                title: const Text('MoodCast+ & abonnement'),
+                subtitle: const Text('Essai, codes promo, futur paiement sur les stores'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const MoodCastPlusScreen()),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+            FeelGoodCard(
+              margin: EdgeInsets.zero,
+              padding: EdgeInsets.zero,
               child: SwitchListTile(
                 title: const Text('Son des podcasts'),
                 subtitle: const Text('Lecture vocale des avis MoodCast'),
@@ -243,12 +260,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 textCapitalization: TextCapitalization.words,
                 onSubmitted: (_) async {
+                  final messenger = ScaffoldMessenger.of(context);
                   await StorageService.setUserName(_userNameController.text.trim());
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Prénom enregistré.'), behavior: SnackBarBehavior.floating),
-                    );
-                  }
+                  if (!mounted) return;
+                  messenger.showSnackBar(
+                    const SnackBar(content: Text('Prénom enregistré.'), behavior: SnackBarBehavior.floating),
+                  );
                 },
               ),
             ),

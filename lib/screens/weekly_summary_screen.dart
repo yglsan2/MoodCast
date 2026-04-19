@@ -4,6 +4,8 @@ import '../models/emotions.dart';
 import '../models/mood_cast.dart';
 import '../services/storage_service.dart';
 import '../services/streak_service.dart';
+import '../services/premium_service.dart';
+import 'mood_cast_plus_screen.dart';
 import '../theme/app_colors.dart';
 import '../widgets/gradient_app_bar.dart';
 import '../widgets/feel_good_card.dart';
@@ -225,6 +227,89 @@ class _WeeklySummaryScreenState extends State<WeeklySummaryScreen> {
                           ),
                         ),
                       ],
+                      const SizedBox(height: 20),
+                      FutureBuilder<bool>(
+                        future: PremiumService.isPremium(),
+                        builder: (context, snap) {
+                          final premium = snap.data ?? false;
+                          final plan = PremiumService.weeklyDeepPlan(dominant, last7.length);
+                          if (premium) {
+                            return FeelGoodCard(
+                              gradient: AppColors.gradientAccent,
+                              padding: const EdgeInsets.all(20),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.auto_awesome, color: AppColors.primary, size: 22),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Plan MoodCast+',
+                                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                              color: AppColors.textPrimary,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    plan,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      height: 1.45,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+                          return FeelGoodCard(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(Icons.lock_outline_rounded, color: AppColors.primary.withValues(alpha: 0.8)),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'Plan d’action personnalisé (MoodCast+)',
+                                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                              color: AppColors.textPrimary,
+                                            ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  'Une suggestion concrète chaque semaine selon ton humeur dominante et ton rythme — pour passer du « je me sens bizarre » au « je sais quoi essoyer ».',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    height: 1.4,
+                                    color: AppColors.textSecondary.withValues(alpha: 0.95),
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                FilledButton(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (_) => const MoodCastPlusScreen()),
+                                    );
+                                  },
+                                  child: const Text('Découvrir MoodCast+'),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
                       const SizedBox(height: 24),
                     ],
                   ),

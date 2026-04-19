@@ -158,7 +158,7 @@ class _SupportScreenState extends State<SupportScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Un encouragement personnalisé ou un message à ton proche.',
+                              'Vocaux d\'encouragement, mini-podcast et message à ton proche.',
                               style: TextStyle(
                                 fontSize: 13,
                                 color: Colors.white.withValues(alpha: 0.95),
