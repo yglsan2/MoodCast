@@ -11,6 +11,7 @@ import 'postit_mood_screen.dart';
 import 'mood_share_screen.dart';
 import 'mood_sos_screen.dart';
 import 'mood_safe_screen.dart';
+import 'sister_aid_screen.dart';
 import 'mood_routine_screen.dart';
 import 'weekly_summary_screen.dart';
 import 'mood_sound_screen.dart';
@@ -234,12 +235,24 @@ class MoreScreen extends StatelessWidget {
             _Tile(
               icon: Icons.shield_rounded,
               title: 'MoodSafe',
-              subtitle: 'Alerte danger discrète – 2 s sur le bouton rouge',
+              subtitle: 'Cercle parents/amis · alerte priorité + position',
               gradient: AppColors.gradientSos,
               onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const MoodSafeScreen()),
+                );
+              },
+            ),
+            _Tile(
+              icon: Icons.favorite_rounded,
+              title: 'Lien Sœurs',
+              subtitle: 'Réservé aux femmes · entraide proximité',
+              gradient: AppColors.gradientSos,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SisterAidScreen()),
                 );
               },
             ),

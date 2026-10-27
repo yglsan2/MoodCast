@@ -267,6 +267,10 @@ class _MoodCastPlusScreenState extends State<MoodCastPlusScreen> {
           const SizedBox(height: 14),
           _benefit(Icons.palette_rounded, 'Styles podcast « Poésie » & « Énergie » — textes plus travaillés.'),
           _benefit(Icons.auto_graph_rounded, 'Plan d’action hebdo personnalisé dans le résumé de semaine.'),
+          _benefit(
+            Icons.shield_rounded,
+            'Sécurité+ MoodSafe : durée Diwall personnalisable (2–10 s), SOS classique avec délai d’annulation.',
+          ),
           _benefit(Icons.favorite_rounded, 'Soutient le développement : nouvelles voix, meilleure analyse, plus de douceur dans l’app.'),
         ],
       ),

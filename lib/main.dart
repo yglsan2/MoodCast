@@ -5,6 +5,7 @@ import 'package:intl/date_symbol_data_local.dart';
 
 import 'theme/app_theme.dart';
 import 'screens/home_shell.dart';
+import 'services/attention_mode_service.dart';
 import 'services/notification_service.dart';
 
 void main() async {
@@ -25,6 +26,16 @@ void main() async {
       await NotificationService.updateRoutineReminders();
     } catch (e, st) {
       debugPrint('NotificationService.updateRoutineReminders: $e\n$st');
+    }
+    try {
+      await AttentionModeService.restoreSession();
+    } catch (e, st) {
+      debugPrint('AttentionModeService.restoreSession: $e\n$st');
+    }
+    try {
+      await AttentionModeService.handleCheckInExpiredIfNeeded();
+    } catch (e, st) {
+      debugPrint('AttentionModeService.handleCheckInExpiredIfNeeded: $e\n$st');
     }
   });
 }

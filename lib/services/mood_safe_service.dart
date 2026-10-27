@@ -2,6 +2,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/emotions.dart';
+import 'mood_safe_log.dart';
+import 'sms_sender_service.dart';
 import 'storage_service.dart';
 
 /// Alerte danger MoodSafe : message type "Alerte danger", position, optionnel dernier mood.
@@ -14,43 +16,66 @@ class MoodSafeService {
   static const Duration _locationTimeout = Duration(seconds: 5);
 
   /// Construit le message d'alerte (position + optionnel dernier mood).
-  static Future<String> buildMessage() async {
-    String body = _messagePrefix;
-
+  static Future<String> buildMessage({String? prefix}) async {
+    var body = prefix ?? _messagePrefix;
     try {
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        await Geolocator.requestPermission();
+      // 1) Permission
+      try {
+        var permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+        }
+      } catch (e) {
+        MoodSafeLog.warn('buildMessage permission', e);
       }
-      if (await Geolocator.isLocationServiceEnabled()) {
-        final position = await Geolocator.getCurrentPosition(
-          locationSettings: LocationSettings(timeLimit: _locationTimeout),
-        );
-        final url =
-            'https://www.google.com/maps?q=${position.latitude},${position.longitude}';
-        body += 'Ma position : $url';
-      } else {
+
+      // 2) GPS
+      try {
+        if (await Geolocator.isLocationServiceEnabled()) {
+          final position = await Geolocator.getCurrentPosition(
+            locationSettings: LocationSettings(timeLimit: _locationTimeout),
+          );
+          final url =
+              'https://www.google.com/maps?q=${position.latitude},${position.longitude}';
+          body += 'Ma position : $url';
+        } else {
+          body += 'Ma position n\'a pas pu être récupérée.';
+        }
+      } catch (e) {
+        MoodSafeLog.warn('buildMessage GPS', e);
         body += 'Ma position n\'a pas pu être récupérée.';
       }
-    } catch (_) {
-      body += 'Ma position n\'a pas pu être récupérée.';
-    }
 
-    final includeMood = await StorageService.getMoodSafeIncludeMood();
-    if (includeMood) {
-      final moodCasts = await StorageService.getMoodCasts();
-      moodCasts.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-      if (moodCasts.isNotEmpty) {
-        final last = moodCasts.first;
-        body += '\n\nDernier mood : ${Emotions.label(last.emotion)}.';
+      // 3) Mood optionnel
+      try {
+        final includeMood = await StorageService.getMoodSafeIncludeMood();
+        if (includeMood) {
+          final moodCasts = await StorageService.getMoodCasts();
+          moodCasts.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+          if (moodCasts.isNotEmpty) {
+            final last = moodCasts.first;
+            body += '\n\nDernier mood : ${Emotions.label(last.emotion)}.';
+          }
+        }
+      } catch (e) {
+        MoodSafeLog.warn('buildMessage mood', e);
       }
-    }
 
-    return body;
+      // 4) Timestamp de secours
+      try {
+        body += '\nHeure : ${DateTime.now().toIso8601String()}';
+      } catch (_) {}
+
+      return body;
+    } catch (e, st) {
+      MoodSafeLog.error('buildMessage fatal', e, st);
+      return '${prefix ?? _messagePrefix}Ma position n\'a pas pu être récupérée.';
+    } finally {
+      MoodSafeLog.info('buildMessage finally len=${body.length}');
+    }
   }
 
-  /// Déclenche l'alerte : ouvre le SMS au premier contact avec le message d'alerte.
-  /// Retourne (succès, message utilisé, liste des autres numéros pour envoi supplémentaire).
+  /// Déclenche l'alerte vers tous les contacts (SMS auto Android, composeur sinon).
   static Future<MoodSafeTriggerResult> trigger() async {
     final phones = await StorageService.getMoodSafePhones();
     if (phones.isEmpty) {
@@ -58,14 +83,16 @@ class MoodSafeService {
     }
 
     final message = await buildMessage();
-    final first = phones.first;
-    final remaining = phones.length > 1 ? phones.sublist(1) : <String>[];
+    final result = await SmsSenderService.sendToMany(phones, message);
+    final remaining = phones.length > 1 && result.openedComposer
+        ? phones.sublist(1)
+        : <String>[];
 
-    final opened = await _openSmsTo(first, message);
     return MoodSafeTriggerResult(
-      success: opened,
+      success: result.success,
       message: message,
       remainingPhones: remaining,
+      sentDirect: result.sentDirect,
     );
   }
 
@@ -85,9 +112,6 @@ class MoodSafeService {
     return false;
   }
 
-  static Future<bool> _openSmsTo(String phone, String body) async {
-    return openSmsTo(phone, body);
-  }
 }
 
 class MoodSafeTriggerResult {
@@ -95,9 +119,11 @@ class MoodSafeTriggerResult {
     required this.success,
     required this.message,
     required this.remainingPhones,
+    this.sentDirect = 0,
   });
 
   final bool success;
   final String message;
   final List<String> remainingPhones;
+  final int sentDirect;
 }

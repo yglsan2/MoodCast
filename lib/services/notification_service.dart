@@ -17,6 +17,9 @@ class NotificationService {
   static const int _idRoutineMorning = 1;
   static const int _idRoutineEvening = 2;
   static const int _idRiskDaysBase = 20; // 21..27 pour weekdays 1..7
+  static const int _idEmergency = 900;
+  static const int _idCheckIn = 901;
+  static const int _idIncomingAlert = 902;
 
   static bool _initialized = false;
 
@@ -52,6 +55,17 @@ class NotificationService {
       final androidPlugin = _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
       if (androidPlugin != null) {
         await androidPlugin.requestNotificationsPermission();
+        // Canal urgences : importance max. bypassDnd si l'utilisateur accorde l'accès politique notif.
+        await androidPlugin.createNotificationChannel(
+          const AndroidNotificationChannel(
+            'moodcast_emergency',
+            'Alertes Diwall / Urgence',
+            description: 'Alertes de sécurité MoodCast — priorité maximale',
+            importance: Importance.max,
+            playSound: true,
+            enableVibration: true,
+          ),
+        );
       }
       final iosPlugin = _plugin.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
       if (iosPlugin != null) {
@@ -136,6 +150,109 @@ class NotificationService {
         matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
       );
     }
+  }
+
+  /// Alerte immédiate haute priorité (son + vibration, tente de passer le DND Android).
+  static Future<void> showEmergencyAlert({
+    required String title,
+    required String body,
+  }) async {
+    await init();
+    if (kIsWeb) return;
+    const androidDetails = AndroidNotificationDetails(
+      'moodcast_emergency',
+      'Alertes Diwall / Urgence',
+      channelDescription: 'Alertes de sécurité MoodCast — priorité maximale',
+      importance: Importance.max,
+      priority: Priority.max,
+      category: AndroidNotificationCategory.alarm,
+      fullScreenIntent: true,
+      playSound: true,
+      enableVibration: true,
+      visibility: NotificationVisibility.public,
+      ticker: 'Alerte MoodCast',
+    );
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+      interruptionLevel: InterruptionLevel.timeSensitive,
+    );
+    const details = NotificationDetails(android: androidDetails, iOS: iosDetails);
+    await _plugin.show(_idEmergency, title, body, details);
+  }
+
+  /// Simule une alerte reçue d'un proche (pour tester le canal prioritaire).
+  static Future<void> showIncomingSafetyAlert({
+    required String fromName,
+    required String mapsUrl,
+  }) async {
+    await init();
+    if (kIsWeb) return;
+    const androidDetails = AndroidNotificationDetails(
+      'moodcast_emergency',
+      'Alertes Diwall / Urgence',
+      channelDescription: 'Alertes de sécurité MoodCast — priorité maximale',
+      importance: Importance.max,
+      priority: Priority.max,
+      category: AndroidNotificationCategory.alarm,
+      fullScreenIntent: true,
+      playSound: true,
+      enableVibration: true,
+      visibility: NotificationVisibility.public,
+    );
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+      interruptionLevel: InterruptionLevel.timeSensitive,
+    );
+    const details = NotificationDetails(android: androidDetails, iOS: iosDetails);
+    await _plugin.show(
+      _idIncomingAlert,
+      '🚨 $fromName a besoin d’aide',
+      'Ouvre sa position : $mapsUrl',
+      details,
+    );
+  }
+
+  static Future<void> scheduleCheckInReminder(DateTime until) async {
+    await init();
+    if (kIsWeb) return;
+    await _plugin.cancel(_idCheckIn);
+    final scheduled = tz.TZDateTime.from(until, tz.local);
+    if (scheduled.isBefore(tz.TZDateTime.now(tz.local))) return;
+
+    const androidDetails = AndroidNotificationDetails(
+      'moodcast_emergency',
+      'Alertes Diwall / Urgence',
+      channelDescription: 'Alertes de sécurité MoodCast — priorité maximale',
+      importance: Importance.max,
+      priority: Priority.max,
+      category: AndroidNotificationCategory.alarm,
+    );
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentSound: true,
+      interruptionLevel: InterruptionLevel.timeSensitive,
+    );
+    const details = NotificationDetails(android: androidDetails, iOS: iosDetails);
+
+    await _plugin.zonedSchedule(
+      _idCheckIn,
+      'Check-in MoodSafe',
+      'Confirme que tu vas bien, sinon l’alerte partira à tes proches.',
+      scheduled,
+      details,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+    );
+  }
+
+  static Future<void> cancelCheckInReminder() async {
+    await init();
+    if (kIsWeb) return;
+    await _plugin.cancel(_idCheckIn);
   }
 
   static tz.TZDateTime _nextWeekdayAt(tz.TZDateTime from, int weekday, int hour, int minute) {

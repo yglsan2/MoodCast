@@ -3,6 +3,9 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/mood_cast.dart';
+import '../models/mood_safe_session.dart';
+import '../models/safety_circle.dart';
+import '../models/sister_aid.dart';
 
 class StorageService {
   StorageService._();
@@ -233,8 +236,25 @@ class StorageService {
     } catch (_) {}
   }
 
-  /// Liste des numéros MoodSafe : contact principal + optionnels 2 et 3 (sans espaces).
+  /// Liste des numéros MoodSafe : cercle de confiance, sinon legacy (1+2+3).
   static Future<List<String>> getMoodSafePhones() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_keySafetyCircle);
+      final circle = SafetyCircleData.tryDecode(raw);
+      if (circle != null && circle.contacts.isNotEmpty) {
+        final seen = <String>{};
+        final out = <String>[];
+        for (final c in circle.resolveAlertRecipients()) {
+          final p = c.cleanPhone;
+          if (p.isEmpty || seen.contains(p)) continue;
+          seen.add(p);
+          out.add(p);
+        }
+        if (out.isNotEmpty) return out;
+      }
+    } catch (_) {}
+
     final list = <String>[];
     final p1 = await getAlertContactPhone();
     if (p1 != null && p1.trim().isNotEmpty) {
@@ -618,6 +638,302 @@ class StorageService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_keyFreeTrialConsumed, value);
+    } catch (_) {}
+  }
+
+  // ——— Cercle de confiance / Mode Diwall ———
+  static const String _keySafetyCircle = 'safety_circle_v1';
+  static const String _keyAttentionAlertActive = 'attention_alert_active';
+  static const String _keyAttentionCheckInUntil = 'attention_checkin_until';
+  static const String _keyAttentionAlertLogs = 'attention_alert_logs';
+  static const String _keyAttentionDiscrete = 'attention_discrete_mode';
+
+  static Future<SafetyCircleData> getSafetyCircle() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_keySafetyCircle);
+      final parsed = SafetyCircleData.tryDecode(raw);
+      if (parsed != null && parsed.contacts.isNotEmpty) return parsed;
+      return await _migrateLegacyToSafetyCircle();
+    } catch (_) {
+      return const SafetyCircleData();
+    }
+  }
+
+  static Future<SafetyCircleData> _migrateLegacyToSafetyCircle() async {
+    final contacts = <SafetyContact>[];
+    final name = await getAlertContactName();
+    final p1 = await getAlertContactPhone();
+    if (p1 != null && p1.trim().isNotEmpty) {
+      contacts.add(SafetyContact(
+        id: 'legacy_1',
+        name: (name != null && name.trim().isNotEmpty) ? name.trim() : 'Contact principal',
+        phone: p1.trim(),
+        relation: SafetyRelation.parent,
+        priority: true,
+      ));
+    }
+    final p2 = await getMoodSafePhone2();
+    if (p2 != null && p2.trim().isNotEmpty) {
+      contacts.add(SafetyContact(
+        id: 'legacy_2',
+        name: 'Contact 2',
+        phone: p2.trim(),
+        relation: SafetyRelation.family,
+        priority: true,
+      ));
+    }
+    final p3 = await getMoodSafePhone3();
+    if (p3 != null && p3.trim().isNotEmpty) {
+      contacts.add(SafetyContact(
+        id: 'legacy_3',
+        name: 'Contact 3',
+        phone: p3.trim(),
+        relation: SafetyRelation.friend,
+      ));
+    }
+    if (contacts.isEmpty) return const SafetyCircleData();
+    final data = SafetyCircleData(
+      contacts: contacts,
+      groups: [
+        SafetyGroup(
+          id: 'group_default',
+          name: 'Cercle de confiance',
+          contactIds: contacts.map((c) => c.id).toList(),
+        ),
+      ],
+    );
+    await setSafetyCircle(data);
+    return data;
+  }
+
+  static Future<void> setSafetyCircle(SafetyCircleData data) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_keySafetyCircle, data.encode());
+    } catch (_) {}
+  }
+
+  static Future<bool> isAttentionAlertActive() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_keyAttentionAlertActive) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<void> setAttentionAlertActive(bool value) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_keyAttentionAlertActive, value);
+    } catch (_) {}
+  }
+
+  static Future<DateTime?> getAttentionCheckInUntil() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final s = prefs.getString(_keyAttentionCheckInUntil);
+      if (s == null || s.isEmpty) return null;
+      return DateTime.tryParse(s);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> setAttentionCheckInUntil(DateTime? until) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (until == null) {
+        await prefs.remove(_keyAttentionCheckInUntil);
+      } else {
+        await prefs.setString(_keyAttentionCheckInUntil, until.toIso8601String());
+      }
+    } catch (_) {}
+  }
+
+  static Future<bool> getAttentionDiscreteMode() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_keyAttentionDiscrete) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<void> setAttentionDiscreteMode(bool value) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_keyAttentionDiscrete, value);
+    } catch (_) {}
+  }
+
+  static Future<List<AttentionAlertLog>> getAttentionAlertLogs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_keyAttentionAlertLogs);
+      if (raw == null || raw.isEmpty) return [];
+      final list = jsonDecode(raw) as List<dynamic>?;
+      if (list == null) return [];
+      return list
+          .map((e) => AttentionAlertLog.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static Future<void> addAttentionAlertLog(AttentionAlertLog log) async {
+    try {
+      final logs = await getAttentionAlertLogs();
+      logs.insert(0, log);
+      final trimmed = logs.take(30).toList();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _keyAttentionAlertLogs,
+        jsonEncode(trimmed.map((e) => e.toJson()).toList()),
+      );
+    } catch (_) {}
+  }
+
+  // ——— Lien Sœurs (entraide proximité) ———
+  static const String _keySisterAid = 'sister_aid_network_v1';
+  static const String _keySisterPresenceLat = 'sister_aid_my_lat';
+  static const String _keySisterPresenceLng = 'sister_aid_my_lng';
+  static const String _keySisterPresenceAt = 'sister_aid_my_at';
+  static const String _keySisterHelpLogs = 'sister_aid_help_logs';
+
+  static Future<SisterAidNetwork> getSisterAidNetwork() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return SisterAidNetwork.tryDecode(prefs.getString(_keySisterAid)) ??
+          const SisterAidNetwork();
+    } catch (_) {
+      return const SisterAidNetwork();
+    }
+  }
+
+  static Future<void> setSisterAidNetwork(SisterAidNetwork network) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_keySisterAid, network.encode());
+    } catch (_) {}
+  }
+
+  static Future<void> setSisterAidMyPresence({
+    required double lat,
+    required double lng,
+    required DateTime at,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble(_keySisterPresenceLat, lat);
+      await prefs.setDouble(_keySisterPresenceLng, lng);
+      await prefs.setString(_keySisterPresenceAt, at.toIso8601String());
+    } catch (_) {}
+  }
+
+  static Future<List<SisterHelpLog>> getSisterHelpLogs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_keySisterHelpLogs);
+      if (raw == null || raw.isEmpty) return [];
+      final list = jsonDecode(raw) as List<dynamic>?;
+      if (list == null) return [];
+      return list
+          .map((e) => SisterHelpLog.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static Future<void> addSisterHelpLog(SisterHelpLog log) async {
+    try {
+      final logs = await getSisterHelpLogs();
+      logs.insert(0, log);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _keySisterHelpLogs,
+        jsonEncode(logs.take(30).map((e) => e.toJson()).toList()),
+      );
+    } catch (_) {}
+  }
+
+  // ——— MoodSafe unifié : diffusion + session ———
+  static const String _keyDiffusionProfile = 'moodsafe_diffusion_v1';
+  static const String _keyAlertSession = 'moodsafe_alert_session_v1';
+
+  static Future<DiffusionProfile> getDiffusionProfile() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = DiffusionProfile.tryDecode(prefs.getString(_keyDiffusionProfile));
+      return _lockDiffusionForTier(raw);
+    } catch (_) {
+      return const DiffusionProfile();
+    }
+  }
+
+  static Future<void> setDiffusionProfile(DiffusionProfile profile) async {
+    try {
+      // Applique les garde-fous free / Sécurité+ avant persist.
+      final locked = await _lockDiffusionForTier(profile);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_keyDiffusionProfile, locked.encode());
+    } catch (_) {}
+  }
+
+  static Future<DiffusionProfile> _lockDiffusionForTier(DiffusionProfile profile) async {
+    try {
+      final premium = await _isSecurityPremium();
+      if (premium) {
+        return profile.copyWith(
+          attentionHoldSeconds: profile.attentionHoldSeconds.clamp(2, 10),
+          classicCancelSeconds: profile.classicCancelSeconds.clamp(5, 15),
+        );
+      }
+      return profile.copyWith(
+        attentionHoldSeconds: 3,
+        classicCancelSeconds: 8,
+        defaultTrigger: AttentionTriggerStyle.deadManSwitch,
+      );
+    } catch (_) {
+      // Fallback le plus sûr : free defaults
+      return profile.copyWith(
+        attentionHoldSeconds: 3,
+        classicCancelSeconds: 8,
+        defaultTrigger: AttentionTriggerStyle.deadManSwitch,
+      );
+    }
+  }
+
+  static Future<bool> _isSecurityPremium() async {
+    try {
+      if (await isLifetimePremium()) return true;
+      final until = await getPremiumUntil();
+      return until != null && until.isAfter(DateTime.now());
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<MoodSafeAlertSession?> getAlertSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return MoodSafeAlertSession.tryDecode(prefs.getString(_keyAlertSession));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> setAlertSession(MoodSafeAlertSession? session) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (session == null) {
+        await prefs.remove(_keyAlertSession);
+      } else {
+        await prefs.setString(_keyAlertSession, session.encode());
+      }
     } catch (_) {}
   }
 

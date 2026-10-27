@@ -14,6 +14,15 @@ class PremiumService {
     return until != null && until.isAfter(DateTime.now());
   }
 
+  /// Pack MoodSafe « Sécurité+ » (inclus dans MoodCast+ pour l’instant).
+  static Future<bool> hasSecurityPremium() => isPremium();
+
+  /// Durée de maintien Mode Diwall en free (non personnalisable).
+  static const int freeAttentionHoldSeconds = 3;
+
+  /// Délai SOS classique free (si un jour exposé sans premium — verrouillé).
+  static const int freeClassicCancelSeconds = 8;
+
   /// Date de fin d’entitlement, ou null (sans abonnement time-bound).
   static Future<DateTime?> entitlementEnd() async {
     if (await StorageService.isLifetimePremium()) return null;

@@ -1,15 +1,11 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/app_colors.dart';
-import '../services/alert_proche_service.dart';
-import '../services/mood_safe_service.dart';
 import '../services/storage_service.dart';
 import '../services/streak_service.dart';
+import 'attention_mode_screen.dart';
 import 'mood_cast_screen.dart';
-import 'settings_screen.dart';
 import 'world_flow_screen.dart';
 import 'journal_screen.dart';
 import 'stats_screen.dart';
@@ -24,8 +20,6 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
-  Timer? _moodSafeTimer;
-  bool _moodSafeTriggeredThisGesture = false;
 
   bool _showDailyTip = true;
   String? _userName;
@@ -89,141 +83,12 @@ class _HomeShellState extends State<HomeShell> {
     return '$hello !';
   }
 
-  Future<void> _onAlerteProche(BuildContext context) async {
-    final ok = await AlertProcheService.trigger();
-    if (!context.mounted) return;
-    if (ok) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('SMS prêt à envoyer — il ne reste qu’à appuyer sur Envoyer.'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: AppColors.primary,
-          duration: const Duration(seconds: 3),
-        ),
-      );
-    } else {
-      final go = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Alerte proche'),
-          content: const Text(
-            'Pour utiliser l’alerte en un geste, enregistrez le numéro d’un proche de confiance.\n\n'
-            'Allez dans Plus → Paramètres → Alerte sécurité.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Plus tard'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Paramètres'),
-            ),
-          ],
-        ),
-      );
-      if (go == true && context.mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const SettingsScreen()),
-        );
-      }
-    }
-  }
-
-  void _onMoodSafeLongPressStart() {
-    _moodSafeTriggeredThisGesture = false;
-    _moodSafeTimer?.cancel();
-    _moodSafeTimer = Timer(const Duration(seconds: 2), () {
-      _moodSafeTriggeredThisGesture = true;
-      _moodSafeTimer = null;
-      _triggerMoodSafe();
-    });
-  }
-
-  void _onMoodSafeLongPressEnd(BuildContext context) {
-    if (_moodSafeTriggeredThisGesture) {
-      _moodSafeTriggeredThisGesture = false;
-      return;
-    }
-    _moodSafeTimer?.cancel();
-    _moodSafeTimer = null;
-    _onAlerteProche(context);
-  }
-
-  Future<void> _triggerMoodSafe() async {
-    final result = await MoodSafeService.trigger();
-    if (!mounted) return;
-    if (!result.success && result.remainingPhones.isEmpty) {
-      final go = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('MoodSafe'),
-          content: const Text(
-            'Pour envoyer une alerte danger à vos proches, enregistrez au moins un contact de confiance.\n\n'
-            'Plus → Paramètres → Alerte sécurité / MoodSafe.',
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Plus tard')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Paramètres')),
-          ],
-        ),
-      );
-      if (go == true && mounted) {
-        Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
-      }
-      return;
-    }
-    if (result.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Alerte danger — SMS prêt. Envoyez le message.'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: AppColors.error,
-          duration: const Duration(seconds: 4),
-        ),
-      );
-    }
-    if (result.remainingPhones.isNotEmpty && mounted) {
-      _offerSendToOtherContacts(context, result.message, result.remainingPhones);
-    }
-  }
-
-  void _offerSendToOtherContacts(
-    BuildContext context,
-    String message,
-    List<String> remainingPhones,
-  ) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Envoyer à un autre proche ?'),
-        content: Text(
-          'Vous pouvez préparer le même message d’alerte pour ${remainingPhones.length} autre(s) contact(s).',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Non'),
-          ),
-          ...remainingPhones.asMap().entries.map((e) {
-            return FilledButton(
-              onPressed: () async {
-                Navigator.pop(ctx);
-                await MoodSafeService.openSmsTo(e.value, message);
-              },
-              child: Text('Oui, contact ${e.key + 2}'),
-            );
-          }),
-        ],
-      ),
+  void _openAttentionMode() {
+    HapticFeedback.mediumImpact();
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AttentionModeScreen()),
     );
-  }
-
-  @override
-  void dispose() {
-    _moodSafeTimer?.cancel();
-    super.dispose();
   }
 
   @override
@@ -254,42 +119,36 @@ class _HomeShellState extends State<HomeShell> {
         ],
       ),
       floatingActionButton: Tooltip(
-        message:
-            'Appui rapide : SMS à ton proche d’alerte.\nMaintien 2 s : MoodSafe (danger) vers tes contacts de confiance.',
+        message: 'Mode Diwall : maintien 3 s = OK, relâchement = alerte + géoloc',
         waitDuration: const Duration(milliseconds: 400),
         child: Semantics(
           button: true,
-          label: 'Alerte proche. Appui bref pour prévenir un proche, maintien deux secondes pour MoodSafe.',
-          child: GestureDetector(
-            onTapDown: (_) => _onMoodSafeLongPressStart(),
-            onTapUp: (_) => _onMoodSafeLongPressEnd(context),
-            onTapCancel: () => _onMoodSafeLongPressEnd(context),
-            child: Material(
-              elevation: 8,
-              shadowColor: AppColors.error.withValues(alpha: 0.45),
+          label: 'Ouvrir le Mode Diwall MoodSafe',
+          child: Material(
+            elevation: 8,
+            shadowColor: AppColors.error.withValues(alpha: 0.45),
+            borderRadius: BorderRadius.circular(20),
+            color: AppColors.error,
+            child: InkWell(
               borderRadius: BorderRadius.circular(20),
-              color: AppColors.error,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: () {},
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.emergency_rounded, size: 26, color: AppColors.textOnPrimary),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Alerte proche',
-                        style: TextStyle(
-                          color: AppColors.textOnPrimary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                          letterSpacing: 0.2,
-                        ),
+              onTap: _openAttentionMode,
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.shield_rounded, size: 26, color: AppColors.textOnPrimary),
+                    SizedBox(width: 12),
+                    Text(
+                      'Diwall',
+                      style: TextStyle(
+                        color: AppColors.textOnPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        letterSpacing: 0.2,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),

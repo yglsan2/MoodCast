@@ -6,12 +6,14 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/safety_circle.dart';
 import '../services/storage_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/gradient_app_bar.dart';
 import '../widgets/feel_good_card.dart';
 import 'legal_screen.dart';
 import 'mood_cast_plus_screen.dart';
+import 'safety_circle_screen.dart';
 import '../services/notification_service.dart';
 
 /// Paramètres : confidentialité, préférences, à propos.
@@ -82,10 +84,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _saveAlertContact() async {
+    final name = _alertNameController.text.trim();
+    final phone = _alertPhoneController.text.trim();
     await StorageService.setAlertContact(
-      name: _alertNameController.text.trim().isEmpty ? null : _alertNameController.text.trim(),
-      phone: _alertPhoneController.text.trim().isEmpty ? null : _alertPhoneController.text.trim(),
+      name: name.isEmpty ? null : name,
+      phone: phone.isEmpty ? null : phone,
     );
+    if (phone.isNotEmpty) {
+      final circle = await StorageService.getSafetyCircle();
+      final contacts = [...circle.contacts];
+      final displayName = name.isEmpty ? 'Contact principal' : name;
+      if (contacts.isEmpty) {
+        contacts.add(SafetyContact(
+          id: 'legacy_1',
+          name: displayName,
+          phone: phone,
+          relation: SafetyRelation.parent,
+          priority: true,
+        ));
+      } else {
+        contacts[0] = contacts[0].copyWith(name: displayName, phone: phone);
+      }
+      var groups = [...circle.groups];
+      if (groups.isEmpty) {
+        groups = [
+          SafetyGroup(
+            id: 'group_default',
+            name: 'Cercle de confiance',
+            contactIds: contacts.map((c) => c.id).toList(),
+          ),
+        ];
+      }
+      await StorageService.setSafetyCircle(
+        SafetyCircleData(contacts: contacts, groups: groups),
+      );
+    }
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -364,7 +397,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              'Alerte sécurité',
+              'Alerte sécurité / Mode Diwall',
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
@@ -372,7 +405,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 6),
             Text(
-              'En cas de danger, le bouton rouge « Alerte proche » (visible partout dans l\'app) ouvre directement un SMS à ce contact avec votre position. Un seul geste.',
+              'Le bouton rouge « Diwall » ouvre le mode dead-man’s switch : maintien 3 s = OK, '
+              'relâchement = alerte SMS + géoloc à tout le cercle de confiance et aux groupes.',
               style: TextStyle(fontSize: 13, height: 1.4, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 10),
@@ -382,6 +416,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  FilledButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const SafetyCircleScreen()),
+                      );
+                    },
+                    icon: const Icon(Icons.groups_rounded, size: 20),
+                    label: const Text('Gérer le cercle & les groupes'),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Contact principal (rapide)',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
                   TextField(
                     controller: _alertNameController,
                     decoration: const InputDecoration(
@@ -407,14 +459,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   FilledButton.icon(
                     onPressed: _saveAlertContact,
                     icon: const Icon(Icons.save_rounded, size: 20),
-                    label: const Text('Enregistrer'),
+                    label: const Text('Enregistrer le contact principal'),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 20),
             Text(
-              'MoodSafe – Alerte danger',
+              'MoodSafe – Options',
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
@@ -422,8 +474,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 6),
             Text(
-              'Maintenez le bouton « Alerte proche » 2 secondes pour envoyer un message d\'alerte danger à vos contacts de confiance (position + optionnel dernier mood). '
-              'Contact 1 = celui ci-dessus. Vous pouvez ajouter 2 autres numéros ci-dessous.',
+              'Codes de désactivation, contacts additionnels (legacy) et options d’alerte.',
               style: TextStyle(fontSize: 13, height: 1.4, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 10),
